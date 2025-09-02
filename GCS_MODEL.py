@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from Analiysis import AnalysisModule
 # Try import QtWebEngineWidgets, fallback to opening map in browser
 try:
     from PyQt5 import QtWebEngineWidgets
@@ -383,39 +383,42 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Professional Rover GCS — Horizontal Layout")
-        self.resize(1400, 900)
+        self.resize(1400, 700)
 
-        central = QtWidgets.QWidget()
-        self.setCentralWidget(central)
-        main_v = QtWidgets.QVBoxLayout(central)
-        main_v.setContentsMargins(6,6,6,6)
+        # QTabWidget will be the central widget
+        self.tabs = QtWidgets.QTabWidget()
+        self.setCentralWidget(self.tabs)
+
+        # ----------------- Tab 1: Ground Control -----------------
+        rover_tab = QtWidgets.QWidget()
+        main_v = QtWidgets.QVBoxLayout(rover_tab)
+        main_v.setContentsMargins(6, 6, 6, 6)
         main_v.setSpacing(6)
 
-        # UPPER HALF: Map (left 60%) + Cameras stacked (right 40%)
+        # UPPER HALF: Map + Cameras
         upper = QtWidgets.QWidget()
         upper_layout = QtWidgets.QHBoxLayout(upper)
-        upper_layout.setContentsMargins(0,0,0,0)
+        upper_layout.setContentsMargins(0, 0, 0, 0)
         upper_layout.setSpacing(6)
 
         self.map_widget = MapWidget(lat=28.60000, lon=77.20000)
-        # cameras stacked
+
         cams_widget = QtWidgets.QWidget()
         cams_v = QtWidgets.QVBoxLayout(cams_widget)
-        cams_v.setContentsMargins(0,0,0,0)
-        self.cam_top = CameraWidget(cam_source=0, title="Front Camera", fixed_size=(560,320))
-        self.cam_bottom = CameraWidget(cam_source=1, title="Rear Camera", fixed_size=(560,320))
+        cams_v.setContentsMargins(0, 0, 0, 0)
+        self.cam_top = CameraWidget(cam_source=0, title="Front Camera", fixed_size=(560, 320))
+        self.cam_bottom = CameraWidget(cam_source=1, title="Rear Camera", fixed_size=(560, 320))
         cams_v.addWidget(self.cam_top)
         cams_v.addWidget(self.cam_bottom)
 
         upper_layout.addWidget(self.map_widget, 3)
         upper_layout.addWidget(cams_widget, 2)
-
-        main_v.addWidget(upper, 3)  # upper gets more vertical space
+        main_v.addWidget(upper, 3)
 
         # LOWER HALF: Telemetry | Controls | Log
         lower = QtWidgets.QWidget()
         lower_layout = QtWidgets.QHBoxLayout(lower)
-        lower_layout.setContentsMargins(0,0,0,0)
+        lower_layout.setContentsMargins(0, 0, 0, 0)
         lower_layout.setSpacing(6)
 
         self.telemetry = TelemetryPanel()
@@ -425,10 +428,16 @@ class MainWindow(QtWidgets.QMainWindow):
         lower_layout.addWidget(self.telemetry, 2)
         lower_layout.addWidget(self.controls, 2)
         lower_layout.addWidget(self.log_widget, 3)
-
         main_v.addWidget(lower, 1)
 
-        # Connect control actions to logging and map lock/shoot behavior
+        # Add to tabs
+        self.tabs.addTab(rover_tab, "Ground Control")
+
+        # ----------------- Tab 2: Analysis -----------------
+        self.analysis_tab = AnalysisModule()
+        self.tabs.addTab(self.analysis_tab, "Telemetry Analysis")
+
+        # ----------------- Connect signals -----------------
         self.controls.btn_fwd.pressed.connect(lambda: self._cmd("MOVE_FORWARD"))
         self.controls.btn_back.pressed.connect(lambda: self._cmd("MOVE_BACK"))
         self.controls.btn_left.pressed.connect(lambda: self._cmd("TURN_LEFT"))
@@ -445,7 +454,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.log_widget.btn_clear.clicked.connect(self.log_widget.clear)
         self.log_widget.btn_reload.clicked.connect(self._reload_rover)
 
-        # Telemetry simulation timer
+        # ----------------- Telemetry Simulation -----------------
         self._sim_lat = 28.6
         self._sim_lon = 77.2
         self._sim_distance = 0.0
@@ -455,15 +464,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.sim_timer = QtCore.QTimer()
         self.sim_timer.timeout.connect(self._simulate_telemetry)
-        self.sim_timer.start(1500)  # update telemetry every 1.5s
+        self.sim_timer.start(1500)
 
-        # initial log entries
+        # Initial logs
         self.log_widget.log("GCS Started")
         self.log_widget.log("Map & cameras initialized")
 
     # ---------------- command handlers ----------------
     def _cmd(self, cmd_text):
-        # called when control buttons/inputs change
         self.log_widget.log(f"CMD -> {cmd_text}")
 
     def _toggle_lock(self, checked):
@@ -471,15 +479,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.log_widget.log("Target Locked" if checked else "Target Unlocked")
 
     def _activate_shoot(self):
-        # placeholder for real actuate command; log and visual feedback
         self.log_widget.log(">>> SHOOT ACTIVATED <<<")
-        # visual: flash terminal line
         self.log_widget.log("Projectile fired at target coordinates")
 
     def _reload_rover(self):
-        # simulated rover reload — reset simulated telemetry and log
-        self._sim_lat = 28.6
-        self._sim_lon = 77.2
+        self._sim_lat, self._sim_lon = 28.6, 77.2
         self._sim_distance = 0.0
         self._sim_battery = 100.0
         self._sim_speed = 0.0
@@ -488,13 +492,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ---------------- telemetry simulation ----------------
     def _simulate_telemetry(self):
-        # simple motion: move slightly, drain battery a bit
         step = (self.controls.speed_slider.value() / 255.0) * 0.0004
-        # move towards +lat +lon for demo
         self._sim_lat += step + (np.random.randn() * 1e-6)
         self._sim_lon += step + (np.random.randn() * 1e-6)
-        self._sim_distance += (step * 111000)  # approximate meters per degree
-        # speed derived from slider
+        self._sim_distance += (step * 111000)
         self._sim_speed = (self.controls.speed_slider.value() / 255.0) * 1.5
         self._sim_battery = max(0.0, self._sim_battery - (self._sim_speed * 0.02) - 0.05)
         self._sim_temp = 20 + np.random.randn() * 0.5
@@ -507,24 +508,17 @@ class MainWindow(QtWidgets.QMainWindow):
             "lon": self._sim_lon,
             "temp": round(self._sim_temp, 1)
         }
-        # update widgets
         self.telemetry.update(telemetry)
         self.map_widget.update_position(self._sim_lat, self._sim_lon)
-
-        # log updates periodically
         self.log_widget.log(f"Telemetry update | Bat:{telemetry['battery']}% Speed:{telemetry['speed']}m/s Dist:{telemetry['distance']}m")
 
     def closeEvent(self, ev):
-        # release cameras cleanly
-        try:
-            self.cam_top.cap.release()
-        except Exception:
-            pass
-        try:
-            self.cam_bottom.cap.release()
-        except Exception:
-            pass
+        try: self.cam_top.cap.release()
+        except Exception: pass
+        try: self.cam_bottom.cap.release()
+        except Exception: pass
         ev.accept()
+
 
 # ----------------------------
 # Run the app
