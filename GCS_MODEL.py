@@ -20,6 +20,8 @@ import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from Analiysis import AnalysisModule
+from Rover_drone_controlller import FPVController
+from  Frame_analysis import MultiViewModule
 # Try import QtWebEngineWidgets, fallback to opening map in browser
 try:
     from PyQt5 import QtWebEngineWidgets
@@ -382,7 +384,7 @@ class LogWidget(QtWidgets.QGroupBox):
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Professional Rover GCS — Horizontal Layout")
+        self.setWindowTitle("ABHIMANYU ROVER CONTROLLER SYSTEM")
         self.resize(1400, 700)
 
         # QTabWidget will be the central widget
@@ -391,6 +393,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # ----------------- Tab 1: Ground Control -----------------
         rover_tab = QtWidgets.QWidget()
+        self.fpv_controller = FPVController()
+
         main_v = QtWidgets.QVBoxLayout(rover_tab)
         main_v.setContentsMargins(6, 6, 6, 6)
         main_v.setSpacing(6)
@@ -436,8 +440,17 @@ class MainWindow(QtWidgets.QMainWindow):
         # ----------------- Tab 2: Analysis -----------------
         self.analysis_tab = AnalysisModule()
         self.tabs.addTab(self.analysis_tab, "Telemetry Analysis")
+        #--------------------Tab 3: FPV Controlller-----------
+        self.tabs.addTab(self.fpv_controller, "FPV Controller")
+         # Connect tab change
+        self.tabs.currentChanged.connect(self.on_tab_change)
 
+        
+        #------------------ Tab 4: Fame Anaylisis -----------
+        self.multi_view = MultiViewModule()
+        self.tabs.addTab(self.multi_view, "Multi-View")
         # ----------------- Connect signals -----------------
+      
         self.controls.btn_fwd.pressed.connect(lambda: self._cmd("MOVE_FORWARD"))
         self.controls.btn_back.pressed.connect(lambda: self._cmd("MOVE_BACK"))
         self.controls.btn_left.pressed.connect(lambda: self._cmd("TURN_LEFT"))
@@ -469,7 +482,19 @@ class MainWindow(QtWidgets.QMainWindow):
         # Initial logs
         self.log_widget.log("GCS Started")
         self.log_widget.log("Map & cameras initialized")
-
+    #--------------- Tab Switching For Camera Controller--------------------
+    def on_tab_change(self, index):
+        # Get widget at this tab index
+        widget = self.tabs.widget(index)
+        # If FPV tab selected -> start video
+        if widget == self.fpv_controller:
+          self.fpv_controller.activate()
+        else:
+          self.fpv_controller.deactivate()
+        if widget == self.multi_view:
+          self.multi_view.start_capture()
+        else:
+         self.multi_view.stop_capture()  
     # ---------------- command handlers ----------------
     def _cmd(self, cmd_text):
         self.log_widget.log(f"CMD -> {cmd_text}")
