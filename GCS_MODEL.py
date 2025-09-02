@@ -22,6 +22,11 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from Analiysis import AnalysisModule
 from Rover_drone_controlller import FPVController
 from  Frame_analysis import MultiViewModule
+from mission_planner import MissionPlanner
+
+# Read environment variable
+
+OSR_KEY = os.getenv("OSR_KEY")
 # Try import QtWebEngineWidgets, fallback to opening map in browser
 try:
     from PyQt5 import QtWebEngineWidgets
@@ -449,6 +454,9 @@ class MainWindow(QtWidgets.QMainWindow):
         #------------------ Tab 4: Fame Anaylisis -----------
         self.multi_view = MultiViewModule()
         self.tabs.addTab(self.multi_view, "Multi-View")
+        #------------------ Tab 5: Mission Planner ----------
+        self.mission_planner = MissionPlanner(ORS_KEY=OSR_KEY)
+        self.tabs.addTab(self.mission_planner, "Mission Planner")
         # ----------------- Connect signals -----------------
       
         self.controls.btn_fwd.pressed.connect(lambda: self._cmd("MOVE_FORWARD"))
